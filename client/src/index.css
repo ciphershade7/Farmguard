@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..700;1,9..144,300..700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-brand-dark: #163828;
+  --color-brand-dark-hover: #0E271C;
+  --color-brand-forest: #204735;
+  --color-brand-terracotta: #D6785D;
+  --color-brand-terracotta-badge: #B85E3E;
+  --color-brand-cream: #FAF7F2;
+  --color-brand-input-bg: #ECEFEA;
+  --color-brand-input-border: #CCD5CA;
+  --color-brand-pill-bg: #E5ECE3;
+  --color-brand-muted: #6E8275;
+  --color-brand-muted-dark: #485C50;
+  
+  --font-serif: Fraunces, Georgia, serif;
+  --font-sans: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-ring: oklch(0.45 0.06 156);
+  --color-input: oklch(0.87 0.02 120);
+  --color-border: oklch(0.87 0.02 120);
+  --color-primary: oklch(0.33 0.058 156);
+  --color-primary-foreground: oklch(0.973 0.014 88);
+  --color-muted: oklch(0.935 0.016 95);
+  --color-muted-foreground: oklch(0.5 0.024 150);
+  --color-card: oklch(0.982 0.011 88);
+  --color-clay: oklch(0.68 0.116 58);
+  --color-background-login: oklch(0.951 0.017 88);
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: #FAF7F2; /* brand.cream */
+  color: #1F2937;
+}
+
+.custom-scrollbar::-webkit-scrollbar { width: 5px; height: 5px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+@utility paper-grain {
+  background-image: radial-gradient(
+    currentColor 0.5px,
+    transparent 0.5px
+  );
+  background-size: 4px 4px;
+}
+
+/* ---------- motion ---------- */
+
+@keyframes pr-scan {
+  0% {
+    transform: translateX(-30%);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(130%);
+    opacity: 0;
+  }
+}
+
+@keyframes pr-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.pr-scan {
+  animation: pr-scan 9s linear infinite;
+}
+
+.pr-rise {
+  animation: pr-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-scan,
+  .pr-rise {
+    animation: none !important;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+  }
+}
