@@ -37,3 +37,21 @@ FarmGuard is a digital farm management platform designed to help farmers, veteri
 - Maintain treatment history
 
 ---
+## Project Structure
+
+```text
+FarmGuard/
+│
+├── client/              # React frontend
+│   ├── src/
+│   │   ├── components/
+│   │   ├── assets/
+│   │   └── ...
+│   ├── public/
+│   └── package.json
+│
+├── server/              # Node.js / Express backend
+│   ├── index.js
+│   └── package.json
+│
+└── README.md
