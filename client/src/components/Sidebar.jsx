@@ -133,6 +133,12 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, userRole = 'farmer' }) => 
                   System Analytics
                 </button>
               </li>
+              <li>
+                <button onClick={() => setActiveTab('blockchain_dashboard')} className={`w-full text-left ${getTabClass('blockchain_dashboard')}`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                  Blockchain Dashboard
+                </button>
+              </li>
             </>
           )}
         </ul>
