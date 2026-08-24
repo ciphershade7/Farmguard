@@ -3,6 +3,7 @@ const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 require('dotenv').config();
+const blockchain = require('./blockchainClient');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -25,6 +26,67 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
+// Promise wrappers around sqlite3's callback API. Only used by the routes
+// that needed to be rewritten as async functions to await the blockchain
+// anchoring step (log-dose, generate-pass, and the new /api/blockchain/*
+// routes). All other routes in this file are untouched and keep using the
+// original callback style.
+function runAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.run(sql, params, function (err) {
+      if (err) reject(err);
+      else resolve(this); // gives access to this.lastID / this.changes
+    });
+  });
+}
+function getAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.get(sql, params, (err, row) => (err ? reject(err) : resolve(row)));
+  });
+}
+function allAsync(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    db.all(sql, params, (err, rows) => (err ? reject(err) : resolve(rows)));
+  });
+}
+
+/**
+ * Anchor a payload to the blockchain and record the outcome in the local
+ * blockchain_records table, regardless of whether anchoring succeeded.
+ *
+ * If the Hardhat node / contract isn't reachable, this does NOT throw and
+ * does NOT block the caller's main DB write from having already happened -
+ * it just records anchored=0 so the Blockchain Dashboard can show the record
+ * as "not anchored" instead of silently pretending it's on-chain.
+ */
+async function anchorAndStore(recordType, referenceId, farmId, payload) {
+  const createdAt = new Date().toISOString();
+  const localHash = blockchain.canonicalHash(payload);
+
+  try {
+    const result = await blockchain.anchorRecord({ recordType, referenceId, farmId, dataObject: payload });
+    await runAsync(
+      `INSERT INTO blockchain_records
+        (recordType, referenceId, farmId, payloadJson, dataHash, chainIndex, txHash, blockNumber, anchored, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [recordType, referenceId, farmId, JSON.stringify(payload), result.dataHash, result.recordIndex, result.txHash, result.blockNumber, 1, createdAt]
+    );
+    return { anchored: true, txHash: result.txHash, blockNumber: result.blockNumber, dataHash: result.dataHash };
+  } catch (err) {
+    // Blockchain unreachable/not deployed - keep the app fully functional,
+    // just mark this event as not anchored (no fake tx hash is invented).
+    const fallbackHash = `0xUNANCHORED${localHash.slice(2, 12)}`;
+    await runAsync(
+      `INSERT INTO blockchain_records
+        (recordType, referenceId, farmId, payloadJson, dataHash, chainIndex, txHash, blockNumber, anchored, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [recordType, referenceId, farmId, JSON.stringify(payload), localHash, null, fallbackHash, null, 0, createdAt]
+    );
+    console.warn(`[blockchain] Failed to anchor ${recordType} ${referenceId}: ${err.message}`);
+    return { anchored: false, txHash: fallbackHash, blockNumber: null, dataHash: localHash, error: err.message };
+  }
+}
+
 function initDb() {
   db.serialize(() => {
     // Drop existing tables to reseed with multi-farm schema
@@ -35,6 +97,7 @@ function initDb() {
     db.run(`DROP TABLE IF EXISTS consultations`);
     db.run(`DROP TABLE IF EXISTS users`);
     db.run(`DROP TABLE IF EXISTS vet_assignments`);
+    db.run(`DROP TABLE IF EXISTS blockchain_records`);
 
     // Create Users table
     db.run(`CREATE TABLE IF NOT EXISTS users (
@@ -107,6 +170,26 @@ function initDb() {
       action TEXT,
       details TEXT,
       verified BOOLEAN
+    )`);
+
+    // Create Blockchain Records table - one row per attempt to anchor a
+    // FarmGuard event (treatment, batch clearance, ...) to the smart contract.
+    // payloadJson is the exact canonical data that was hashed; dataHash is
+    // that hash; chainIndex/txHash/blockNumber identify where it landed on
+    // the FarmGuardLedger contract. anchored=0 means the chain was
+    // unreachable when this event happened (no fake data is stored).
+    db.run(`CREATE TABLE IF NOT EXISTS blockchain_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      recordType TEXT,
+      referenceId TEXT,
+      farmId TEXT,
+      payloadJson TEXT,
+      dataHash TEXT,
+      chainIndex INTEGER,
+      txHash TEXT,
+      blockNumber INTEGER,
+      anchored INTEGER,
+      createdAt TEXT
     )`);
 
     // Pre-fill Users
@@ -254,96 +337,135 @@ app.get('/api/dashboard', (req, res) => {
   });
 });
 
-app.post('/api/log-dose', (req, res) => {
+app.post('/api/log-dose', async (req, res) => {
   const { tagId, farmId = 'FARM-A', drug, dosage, diagnosis } = req.body;
-  const hash = randomHash();
   const timestamp = new Date().toISOString();
   const actor = 'Dr. R. Verma'; // Using the vet profile from client
   const action = 'Treatment Logged';
   const details = `Administered ${dosage}mL ${drug} to animal ${tagId} for ${diagnosis}. Status set to WITHDRAWAL.`;
   const withdrawalEnd = new Date(Date.now() + 4 * 86400000).toISOString();
 
-  db.serialize(() => {
-    // 1. Insert ledger entry
-    db.run(
-      "INSERT INTO ledger_entries (txHash, timestamp, farmId, actor, action, details, verified) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [hash, timestamp, farmId, actor, action, details, 1],
-      function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        
-        // 2. Update batch status
-        db.run(
-          `UPDATE batch_status 
-           SET status = 'WARNING: ACTIVE WITHDRAWALS',
-               inWithdrawal = inWithdrawal + 1,
-               safeToMilk = safeToMilk - 1
-           WHERE farmId = ?`, [farmId],
-          function (updateErr) {
-             if (updateErr) return res.status(500).json({ error: updateErr.message });
-             
-             // 3. Insert into treatments
-             db.run(
-               "INSERT INTO treatments (animalId, farmId, drug, dosage, date, vet, withdrawalEnd) VALUES (?, ?, ?, ?, ?, ?, ?)",
-               [tagId, farmId, drug, dosage, timestamp, actor, withdrawalEnd],
-               function (treatmentErr) {
-                 if (treatmentErr) return res.status(500).json({ error: treatmentErr.message });
-                 
-                 // 4. Update animals table if tag exists
-                 db.run(
-                   "UPDATE animals SET healthStatus = 'Under Treatment', withdrawalDays = 4 WHERE tagNumber = ? AND farmId = ?",
-                   [tagId, farmId],
-                   function (animalErr) {
-                     if (animalErr) return res.status(500).json({ error: animalErr.message });
-
-                     console.log(`[BLOCKCHAIN_MOCK] Appended block to DB: Dose logged for ${tagId}`);
-                     res.status(200).json({ 
-                       success: true, 
-                       txHash: hash,
-                       message: 'Smart contract executed. Withdrawal locked. Database updated.' 
-                     });
-                   }
-                 );
-               }
-             );
-          }
-        );
-      }
+  try {
+    // 1. Insert into treatments (same write as before)
+    const treatmentResult = await runAsync(
+      "INSERT INTO treatments (animalId, farmId, drug, dosage, date, vet, withdrawalEnd) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [tagId, farmId, drug, dosage, timestamp, actor, withdrawalEnd]
     );
-  });
+    const treatmentId = treatmentResult.lastID;
+
+    // 2. Update batch status (same write as before)
+    await runAsync(
+      `UPDATE batch_status
+       SET status = 'WARNING: ACTIVE WITHDRAWALS',
+           inWithdrawal = inWithdrawal + 1,
+           safeToMilk = safeToMilk - 1
+       WHERE farmId = ?`,
+      [farmId]
+    );
+
+    // 3. Update animals table if tag exists (same write as before)
+    await runAsync(
+      "UPDATE animals SET healthStatus = 'Under Treatment', withdrawalDays = 4 WHERE tagNumber = ? AND farmId = ?",
+      [tagId, farmId]
+    );
+
+    // 4. NEW: anchor this treatment to the FarmGuardLedger smart contract.
+    // The referenceId ties this on-chain record back to the treatments row.
+    const referenceId = `TREATMENT-${treatmentId}`;
+    const payload = {
+      recordType: 'TREATMENT',
+      referenceId,
+      farmId,
+      animalId: tagId,
+      drug,
+      dosage: Number(dosage),
+      diagnosis,
+      date: timestamp,
+      vet: actor,
+      withdrawalEnd,
+    };
+    const anchorResult = await anchorAndStore('TREATMENT', referenceId, farmId, payload);
+
+    // 5. Ledger entry now uses the REAL blockchain tx hash when anchoring
+    // succeeded (or a clearly-labeled unanchored hash when it didn't),
+    // instead of the old randomHash() mock.
+    await runAsync(
+      "INSERT INTO ledger_entries (txHash, timestamp, farmId, actor, action, details, verified) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      [anchorResult.txHash, timestamp, farmId, actor, action, details, anchorResult.anchored ? 1 : 0]
+    );
+
+    console.log(
+      anchorResult.anchored
+        ? `[BLOCKCHAIN] Treatment ${treatmentId} anchored on-chain: tx=${anchorResult.txHash} block=${anchorResult.blockNumber}`
+        : `[BLOCKCHAIN] Treatment ${treatmentId} NOT anchored (${anchorResult.error})`
+    );
+
+    res.status(200).json({
+      success: true,
+      txHash: anchorResult.txHash,
+      blockchainAnchored: anchorResult.anchored,
+      blockNumber: anchorResult.blockNumber,
+      message: anchorResult.anchored
+        ? 'Smart contract executed. Withdrawal locked. Treatment anchored to blockchain.'
+        : 'Withdrawal locked and database updated, but blockchain anchoring failed (is the Hardhat node running and the contract deployed?).',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post('/api/generate-pass', (req, res) => {
+app.post('/api/generate-pass', async (req, res) => {
   const { farmId = 'FARM-A' } = req.body;
-  const hash = randomHash();
   const timestamp = new Date().toISOString();
   const actor = 'FarmGuard Oracle';
   const action = 'Batch Cleared';
   const details = 'Batch certified Zero-Residue and sealed. MRL check passed.';
 
-  db.serialize(() => {
-    db.run(
+  try {
+    const batchRow = await getAsync(`SELECT * FROM batch_status WHERE farmId = ?`, [farmId]);
+    const batchId = batchRow ? batchRow.batchId : 'BCH-UNKNOWN';
+
+    // Same write as before
+    await runAsync(`UPDATE batch_status SET status = 'COMPLIANT' WHERE farmId = ?`, [farmId]);
+
+    // NEW: anchor this withdrawal clearance / batch certification to the
+    // FarmGuardLedger smart contract.
+    const referenceId = batchId;
+    const payload = {
+      recordType: 'BATCH_CLEARANCE',
+      referenceId,
+      farmId,
+      batchId,
+      totalLiters: batchRow ? batchRow.totalLiters : null,
+      safeToMilk: batchRow ? batchRow.safeToMilk : null,
+      inWithdrawal: batchRow ? batchRow.inWithdrawal : null,
+      clearedAt: timestamp,
+    };
+    const anchorResult = await anchorAndStore('BATCH_CLEARANCE', referenceId, farmId, payload);
+
+    await runAsync(
       "INSERT INTO ledger_entries (txHash, timestamp, farmId, actor, action, details, verified) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [hash, timestamp, farmId, actor, action, details, 1],
-      function (err) {
-        if (err) return res.status(500).json({ error: err.message });
-        
-        db.run(
-          `UPDATE batch_status 
-           SET status = 'COMPLIANT'
-           WHERE farmId = ?`, [farmId],
-          function (updateErr) {
-             if (updateErr) return res.status(500).json({ error: updateErr.message });
-             
-             res.status(200).json({ 
-               success: true, 
-               txHash: hash,
-               message: 'Batch Cleared.' 
-             });
-          }
-        );
-      }
+      [anchorResult.txHash, timestamp, farmId, actor, action, details, anchorResult.anchored ? 1 : 0]
     );
-  });
+
+    console.log(
+      anchorResult.anchored
+        ? `[BLOCKCHAIN] Batch ${batchId} clearance anchored on-chain: tx=${anchorResult.txHash} block=${anchorResult.blockNumber}`
+        : `[BLOCKCHAIN] Batch ${batchId} clearance NOT anchored (${anchorResult.error})`
+    );
+
+    res.status(200).json({
+      success: true,
+      txHash: anchorResult.txHash,
+      blockchainAnchored: anchorResult.anchored,
+      blockNumber: anchorResult.blockNumber,
+      message: anchorResult.anchored
+        ? 'Batch Cleared and anchored to blockchain.'
+        : 'Batch Cleared, but blockchain anchoring failed (is the Hardhat node running and the contract deployed?).',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get('/api/farm-stats', (req, res) => {
@@ -423,6 +545,112 @@ app.get('/api/consultations', (req, res) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows);
   });
+});
+
+// ---------------------------------------------------------------------------
+// Blockchain Dashboard endpoints (NEW)
+// ---------------------------------------------------------------------------
+
+// Live network/contract status - always calls the chain, never cached/fake.
+app.get('/api/blockchain/status', async (req, res) => {
+  try {
+    const status = await blockchain.getStatus();
+    const dbCountRow = await getAsync(
+      `SELECT COUNT(*) as total FROM blockchain_records WHERE anchored = 1`
+    );
+    const unanchoredRow = await getAsync(
+      `SELECT COUNT(*) as total FROM blockchain_records WHERE anchored = 0`
+    );
+    res.json({
+      ...status,
+      anchoredRecordsInDb: dbCountRow ? dbCountRow.total : 0,
+      unanchoredRecordsInDb: unanchoredRow ? unanchoredRow.total : 0,
+    });
+  } catch (err) {
+    res.status(500).json({ connected: false, error: err.message });
+  }
+});
+
+// Recent anchoring attempts (successful and failed), newest first.
+//
+// Includes the parsed `payload` that was anchored (animalId, drug, date,
+// vet, etc. for a TREATMENT; batchId, totalLiters, etc. for a
+// BATCH_CLEARANCE). This is the exact data anchorAndStore() hashed at write
+// time, so the Blockchain Dashboard can show human-readable record details
+// without joining back to the treatments/animals tables. If payloadJson is
+// missing or fails to parse, `payload` is null and the dashboard falls back
+// to "Details unavailable" instead of crashing.
+app.get('/api/blockchain/records', async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit) || 20, 100);
+    const rows = await allAsync(
+      `SELECT id, recordType, referenceId, farmId, payloadJson, dataHash, chainIndex, txHash, blockNumber, anchored, createdAt
+       FROM blockchain_records ORDER BY id DESC LIMIT ?`,
+      [limit]
+    );
+    res.json(rows.map(({ payloadJson, ...r }) => {
+      let payload = null;
+      try {
+        payload = payloadJson ? JSON.parse(payloadJson) : null;
+      } catch (_err) {
+        payload = null;
+      }
+      return { ...r, anchored: r.anchored === 1, payload };
+    }));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Recompute the hash of the stored payload and compare it against what is
+// actually stored on-chain right now. This is the "Verify Record" action:
+// it proves the off-chain data hasn't drifted from what was committed.
+app.post('/api/blockchain/verify/:id', async (req, res) => {
+  try {
+    const row = await getAsync(`SELECT * FROM blockchain_records WHERE id = ?`, [req.params.id]);
+    if (!row) return res.status(404).json({ error: 'Blockchain record not found' });
+
+    const payload = JSON.parse(row.payloadJson);
+    const localHash = blockchain.canonicalHash(payload);
+
+    if (!row.anchored || row.chainIndex === null || row.chainIndex === undefined) {
+      return res.json({
+        match: false,
+        anchored: false,
+        recordType: row.recordType,
+        referenceId: row.referenceId,
+        localHash,
+        onChainHash: null,
+        message: 'This record was never anchored to the blockchain (the chain was unreachable when it was created), so there is nothing on-chain to compare against.',
+      });
+    }
+
+    // Live call to the contract - not cached, not read from our own DB copy.
+    const onChain = await blockchain.getRecordOnChain(row.chainIndex);
+    const match =
+      localHash.toLowerCase() === onChain.dataHash.toLowerCase() &&
+      localHash.toLowerCase() === row.dataHash.toLowerCase();
+
+    res.json({
+      match,
+      anchored: true,
+      recordType: row.recordType,
+      referenceId: row.referenceId,
+      farmId: row.farmId,
+      localHash,
+      storedHash: row.dataHash,
+      onChainHash: onChain.dataHash,
+      txHash: row.txHash,
+      blockNumber: row.blockNumber,
+      chainTimestamp: onChain.timestamp,
+      submitter: onChain.submitter,
+      message: match
+        ? 'Match. The data behind this record is identical to what was committed on-chain.'
+        : 'MISMATCH. The locally stored data no longer matches the hash committed on-chain - this record may have been tampered with.',
+    });
+  } catch (err) {
+    res.status(500).json({ match: false, error: err.message });
+  }
 });
 
 app.listen(port, () => {
