@@ -1,24 +1,54 @@
-# FarmGuard
+#  FarmGuard
 
-### Digital Farm Management & Livestock Treatment Compliance Platform
-
-FarmGuard is a full-stack digital farm management platform designed to help farmers, veterinarians, and administrators manage livestock records, treatment history, antimicrobial usage (AMU), withdrawal periods, and Maximum Residue Limit (MRL) compliance through a centralized system.
-
-The platform also includes a local blockchain audit and verification layer using Hardhat, Solidity, and ethers.js to provide tamper-resistant proof for important treatment records.
+A modern digital farm management platform for monitoring **livestock health, antimicrobial usage (AMU), Maximum Residue Limits (MRL), treatment records, and compliance** with an integrated **Blockchain Audit & Verification Layer**.
 
 ---
 
-## Features
+## 🚀 Project Demo
 
-### Farmer Dashboard
+FarmGuard provides separate dashboards and workflows for:
 
-- Herd registry and animal records
+- 👨‍🌾 Farmers
+- 🩺 Veterinarians
+- 👨‍💼 Administrators
+
+---
+
+## 📌 Project Overview
+
+FarmGuard is designed to solve common livestock management and treatment tracking problems such as:
+
+- Lack of centralized livestock records
+- Difficulties tracking treatment history
+- Manual antimicrobial usage monitoring
+- Difficulty monitoring withdrawal periods
+- MRL compliance tracking
+- Lack of reliable treatment audit trails
+
+The platform combines:
+
+- **Full-Stack Web Application**
+- **Livestock & Treatment Management**
+- **AMU & MRL Monitoring**
+- **Role-Based Dashboards**
+- **Blockchain-Based Audit & Verification**
+- **Local Hardhat Blockchain**
+- **Solidity Smart Contracts**
+
+---
+
+## ✨ Features
+
+### 👨‍🌾 Farmer Dashboard
+
+- Herd registry
+- Animal records
 - Animal-specific treatment history
 - Treatment compliance monitoring
 - Farm health overview
 - Veterinarian consultation
 
-### Veterinarian Dashboard
+### 🩺 Veterinarian Dashboard
 
 - Patient/animal management
 - Treatment recording
@@ -26,40 +56,31 @@ The platform also includes a local blockchain audit and verification layer using
 - Maximum Residue Limit (MRL) compliance
 - Withdrawal period tracking
 - Vet consultation management
-- AMU and MRL analytics
+- AMU & MRL analytics
 
-### Admin Dashboard
+### 👨‍💼 Admin Dashboard
 
 - Farm-wide monitoring
 - System analytics
 - Livestock and treatment insights
 - Centralized system overview
 - Blockchain audit dashboard
-- Record verification
+- Blockchain record verification
 
-### Treatment & Compliance
-
-- Record livestock treatments
-- Track antimicrobial usage
-- Monitor withdrawal periods
-- Check MRL-related compliance
-- Maintain treatment history
-- Generate compliance-related insights
-
-### Blockchain Audit & Verification
+### 🔐 Blockchain Audit & Verification
 
 - Local Hardhat blockchain network
-- Solidity smart contract for audit records
+- Solidity smart contract
 - Treatment record hashing
 - Blockchain proof generation
-- Transaction and block information
-- Record verification through blockchain
-- Admin-only Blockchain Dashboard
+- Transaction information
+- Record verification
+- Admin-only blockchain dashboard
 - Backend blockchain integration using ethers.js
 
 ---
 
-## Technology Stack
+## 🛠 Tech Stack
 
 ### Frontend
 
@@ -81,7 +102,7 @@ The platform also includes a local blockchain audit and verification layer using
 - ethers.js
 - Local Ethereum-compatible blockchain
 
-### Development Tools
+### Tools
 
 - VS Code
 - Git
@@ -90,17 +111,17 @@ The platform also includes a local blockchain audit and verification layer using
 
 ---
 
-## Project Structure
+## 📂 Project Structure
 
 FarmGuard/
 │
-├── blockchain/                  # Hardhat blockchain project
-│   ├── contracts/               # Solidity smart contracts
-│   ├── scripts/                 # Deployment/setup scripts
-│   ├── test/                    # Smart contract tests
+├── blockchain/
+│   ├── contracts/
+│   ├── scripts/
+│   ├── test/
 │   └── ...
 │
-├── client/                      # React + Vite frontend
+├── client/
 │   ├── src/
 │   │   ├── components/
 │   │   │   ├── admin/
@@ -112,97 +133,109 @@ FarmGuard/
 │   ├── public/
 │   └── package.json
 │
-├── server/                      # Node.js + Express backend
+├── server/
 │   ├── index.js
-│   ├── blockchainClient.js      # Blockchain integration
+│   ├── blockchainClient.js
 │   └── package.json
 │
 └── README.md
 
 ---
 
-## Architecture
+## 🔗 Blockchain Integration
 
-React + Vite Frontend
-        │
-        ▼
-Node.js + Express Backend
-        │
-        ├──────────────► SQLite Database
-        │
-        ▼
-ethers.js Blockchain Client
-        │
-        ▼
-Hardhat Local Blockchain
-        │
-        ▼
-Solidity Smart Contract
+The blockchain implementation is available in the [blockchain](./blockchain) directory.
+
+### Blockchain Client
+
+The backend communicates with the blockchain through:
+
+[server/blockchainClient.js](./server/blockchainClient.js)
+
+### Blockchain Dashboard
+
+The admin blockchain interface is available at:
+
+[BlockchainDashboard.jsx](./client/src/components/admin/BlockchainDashboard.jsx)
 
 ---
 
-## Blockchain Workflow
+## 🔄 Blockchain Workflow
 
-1. A treatment record is created through the application.
-2. The backend processes the record.
-3. A cryptographic hash/proof is generated for the relevant record data.
-4. The blockchain client communicates with the local Hardhat network through ethers.js.
-5. The proof is recorded through the Solidity smart contract.
-6. Blockchain transaction information can be viewed from the Admin Blockchain Dashboard.
-7. A record can subsequently be verified against its blockchain proof.
-
-The blockchain layer is used as an audit and verification mechanism, while the application's primary operational data remains in the backend database.
+1. Treatment data is recorded through the application.
+2. The backend processes the treatment record.
+3. A cryptographic hash/proof is generated.
+4. The backend communicates with the local Hardhat blockchain through ethers.js.
+5. The proof is recorded using the Solidity smart contract.
+6. Blockchain transaction details can be viewed through the Admin Blockchain Dashboard.
+7. The record can be verified against its blockchain proof.
 
 ---
 
-## Running the Project
+## ⚙️ Installation
+
+### Clone the Repository
+
+    git clone https://github.com/YOUR-USERNAME/YOUR-REPOSITORY.git
+    cd FarmGuard
 
 ### Install Frontend Dependencies
 
-cd client
-npm install
+    cd client
+    npm install
 
 ### Install Backend Dependencies
 
-cd ../server
-npm install
+    cd ../server
+    npm install
 
 ### Install Blockchain Dependencies
 
-cd ../blockchain
-npm install
+    cd ../blockchain
+    npm install
 
-### Start the Backend
+---
 
-cd server
-npm start
+## ▶️ Running the Project
 
-### Start the Frontend
+### Start Backend
+
+    cd server
+    npm start
+
+### Start Frontend
 
 Open another terminal:
 
-cd client
-npm run dev
+    cd client
+    npm run dev
 
-### Start the Local Blockchain
+### Start Blockchain
 
-Open another terminal and start the Hardhat local network using the project's configured Hardhat commands.
-
----
-
-## Purpose
-
-FarmGuard aims to provide a centralized digital platform for livestock treatment management while improving transparency, traceability, and auditability of treatment records.
-
-The combination of a conventional database with a blockchain-based verification layer allows the system to maintain practical application data while providing an additional layer of tamper-evident record verification.
+Open another terminal and start the configured Hardhat local network.
 
 ---
 
-## Project Status
+## 🎯 Purpose
 
-**Project:** FarmGuard  
-**Type:** Full-Stack Web Application with Blockchain Audit Layer  
-**Frontend:** React + Vite  
-**Backend:** Node.js + Express  
-**Database:** SQLite  
+FarmGuard aims to improve livestock treatment management by providing a centralized platform for **record keeping, compliance monitoring, analytics, and blockchain-backed verification**.
+
+The blockchain layer provides an additional **tamper-evident audit mechanism** while the application's operational data remains managed through the backend database.
+
+---
+
+## 👨‍💻 Project
+
+**FarmGuard**
+
+**Type:** Full-Stack Web Application + Blockchain Audit Layer
+
+**Frontend:** React + Vite
+
+**Backend:** Node.js + Express
+
+**Database:** SQLite
+
 **Blockchain:** Hardhat + Solidity + ethers.js
+
+---
