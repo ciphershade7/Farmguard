@@ -39,7 +39,7 @@ The platform combines:
 
 ## ✨ Features
 
-### 👨‍🌾 Farmer Dashboard
+###  Farmer Dashboard
 
 - Herd registry
 - Animal records
@@ -48,7 +48,7 @@ The platform combines:
 - Farm health overview
 - Veterinarian consultation
 
-### 🩺 Veterinarian Dashboard
+###  Veterinarian Dashboard
 
 - Patient/animal management
 - Treatment recording
@@ -58,7 +58,7 @@ The platform combines:
 - Vet consultation management
 - AMU & MRL analytics
 
-### 👨‍💼 Admin Dashboard
+###  Admin Dashboard
 
 - Farm-wide monitoring
 - System analytics
@@ -67,7 +67,7 @@ The platform combines:
 - Blockchain audit dashboard
 - Blockchain record verification
 
-### 🔐 Blockchain Audit & Verification
+###  Blockchain Audit & Verification
 
 - Local Hardhat blockchain network
 - Solidity smart contract
@@ -80,7 +80,7 @@ The platform combines:
 
 ---
 
-## 🛠 Tech Stack
+##  Tech Stack
 
 ### Frontend
 
@@ -109,40 +109,8 @@ The platform combines:
 - GitHub
 - npm
 
----
 
-## 📂 Project Structure
-
-FarmGuard/
-│
-├── blockchain/
-│   ├── contracts/
-│   ├── scripts/
-│   ├── test/
-│   └── ...
-│
-├── client/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── admin/
-│   │   │   │   └── BlockchainDashboard.jsx
-│   │   │   ├── Sidebar.jsx
-│   │   │   └── ...
-│   │   ├── App.jsx
-│   │   └── ...
-│   ├── public/
-│   └── package.json
-│
-├── server/
-│   ├── index.js
-│   ├── blockchainClient.js
-│   └── package.json
-│
-└── README.md
-
----
-
-## 🔗 Blockchain Integration
+##  Blockchain Integration
 
 The blockchain implementation is available in the [blockchain](./blockchain) directory.
 
@@ -160,7 +128,7 @@ The admin blockchain interface is available at:
 
 ---
 
-## 🔄 Blockchain Workflow
+##  Blockchain Workflow
 
 1. Treatment data is recorded through the application.
 2. The backend processes the treatment record.
@@ -172,7 +140,7 @@ The admin blockchain interface is available at:
 
 ---
 
-## ⚙️ Installation
+##  Installation
 
 ### Clone the Repository
 
@@ -196,7 +164,7 @@ The admin blockchain interface is available at:
 
 ---
 
-## ▶️ Running the Project
+##  Running the Project
 
 ### Start Backend
 
@@ -216,7 +184,7 @@ Open another terminal and start the configured Hardhat local network.
 
 ---
 
-## 🎯 Purpose
+##  Purpose
 
 FarmGuard aims to improve livestock treatment management by providing a centralized platform for **record keeping, compliance monitoring, analytics, and blockchain-backed verification**.
 
@@ -224,7 +192,7 @@ The blockchain layer provides an additional **tamper-evident audit mechanism** w
 
 ---
 
-## 👨‍💻 Project
+##  Project
 
 **FarmGuard**
 
