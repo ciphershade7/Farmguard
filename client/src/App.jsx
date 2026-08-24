@@ -24,6 +24,7 @@ import VetConsultations from './components/vet/VetConsultations';
 import VetAMU from './components/vet/VetAMU';
 import SystemAnalytics from './components/admin/SystemAnalytics';
 import FarmMonitor from './components/admin/FarmMonitor';
+import BlockchainDashboard from './components/admin/BlockchainDashboard';
 import VerifyPage from './components/VerifyPage';
 
 function App() {
@@ -175,6 +176,7 @@ function App() {
     if (activeTab === 'network') return <NetworkStatus />;
     if (activeTab === 'farm_monitor') return <FarmMonitor />;
     if (activeTab === 'system_analytics' || activeTab === 'admin_dashboard') return <SystemAnalytics />;
+    if (activeTab === 'blockchain_dashboard') return <BlockchainDashboard />;
     
     // Farmer Tabs
     if (activeTab === 'farm_dashboard') return <FarmDashboard currentUser={currentUser} />;
